@@ -1,6 +1,15 @@
 #include "types.h"
 #include "user.h"
 #define NTHREAD        10  // maximum number of threads 
+// Saves the value of esp to var
+#define STORE_ESP(var) asm("movl %%esp, %0;" : "=r" ( var ))
+// Loads the contents of var into esp
+#define LOAD_ESP(var) asm("movl %0, %%esp;" : : "r" ( var ))
+// Calls the function func
+#define CALL(addr) asm("call *%0;" : : "r" ( addr ))
+// Pushes the contents of var to the stack
+#define PUSH(var) asm("movl %0, %%edi; push %%edi;" : : "r" ( var ))
+#define PUSH_EBP 1
 
 
 enum states{UNUSED, RUNNABLE, RUNNING}
@@ -8,7 +17,8 @@ enum states{UNUSED, RUNNABLE, RUNNING}
 struct tcb{
   int tid;
   int state;
-  void *sp;
+  uint *sp;
+  void *stack;
 };
 
 int nexttid; // next value for tid
@@ -50,7 +60,7 @@ void uthread_create(void *func){
 
   for(u = threadtable; u < &threadtable[NTHREAD]; u++){
     if(u->state == UNUSED){
-      u->sp = malloc(4096);
+      u->stack = malloc(4096);
       // Need to build stack
       // set up eip to func
       u->state = RUNNABLE;
@@ -84,11 +94,12 @@ void uthread_scheduler(){
     if(threadtable[i]->state == RUNNABLE){
       threadtable[i]->state = RUNNING;
       curthread = i;
+      context_switch(curthread, newthread);
       // context switch occurs
     }
     // If found should never reach here
     i = 0;
-    if(i = 0; i <= j; i++){
+    for(i = 0; i <= j; i++){
       if(threadtable[i]->state == RUNNABLE){
         threadtable[i]->state = RUNNING;
         curthread = i;
@@ -96,6 +107,23 @@ void uthread_scheduler(){
       }
     }
   }
+}
+
+void context_switch(tcb curthread, tcb newthread){
+  Save context for current thread:
+  PUSH_EBP();
+  STORE_ESP(curthread->sp);
+
+  Load context for new thread:
+  LOAD_ESP(newthread->sp);
+  set esp to top of new stack
+
+  POP_EBP();
+  pop ebp from stack
+
+  return;
+  pop return address from stack
+
 }
 
 void ping(){
