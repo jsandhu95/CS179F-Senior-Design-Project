@@ -111,6 +111,8 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+  p->isthread = 0;
+  p->threadcount = 0;
 
   return p;
 }
@@ -221,6 +223,59 @@ fork(void)
   return pid;
 }
 
+// Jeevan
+int
+kthread_fork(char* stack, void* pointer)
+{
+  int i, pid;
+  struct proc *np;
+  struct proc *curproc = myproc();
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  // Jeevan
+  np->ustack = stack;
+  np->pgdir = curproc->pgdir;
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+  np->isthread = 1;
+  curproc->threadcount++;
+
+  // Jeevan
+  np->tf->esp = (uint)(stack + 4096 - (24*sizeof(int *)));
+  np->tf->ebp = np->tf->esp;
+  np->tf->eip = (int)pointer;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+/*  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+*/
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = curproc->ofile[i];
+  np->cwd = curproc->cwd;
+
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  pid = np->pid;
+
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+
+  return pid;
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -231,8 +286,24 @@ exit(void)
   struct proc *p;
   int fd;
 
+  // Jeevan
+  // If thread tries to exit, redirect and never returns
+  if(curproc->isthread){
+    cprintf("Thread Exiting\n");
+    kthread_exit();
+  }
+
   if(curproc == initproc)
     panic("init exiting");
+
+  // Jeevan
+  // Wait for all child threads to exit before parent process exits
+  // Unless process has been killed, then kill all children as well
+  if(!curproc->killed){
+    while(curproc->threadcount){
+      wait();
+    }
+  }
 
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
@@ -267,6 +338,53 @@ exit(void)
   panic("zombie exit");
 }
 
+void
+kthread_exit(void)
+{
+  struct proc *curproc = myproc();
+
+  // Jeevan
+  // If process calls kthread_exit(), redirect to exit()
+  if(!curproc->isthread)
+    exit();
+
+  if(curproc == initproc)
+    panic("init exiting");
+
+/*
+  // Close all open files.
+  for(fd = 0; fd < NOFILE; fd++){
+    if(curproc->ofile[fd]){
+      fileclose(curproc->ofile[fd]);
+      curproc->ofile[fd] = 0;
+    }
+  }
+
+  begin_op();
+  iput(curproc->cwd);
+  end_op();
+  curproc->cwd = 0;
+*/
+  acquire(&ptable.lock);
+
+  // Parent might be sleeping in wait().
+  wakeup1(curproc->parent);
+
+  // Pass abandoned children to init.
+/*  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->parent == curproc){
+      p->parent = initproc;
+      if(p->state == ZOMBIE)
+        wakeup1(initproc);
+    }
+  }
+*/
+  // Jump into the scheduler, never to return.
+  curproc->state = ZOMBIE;
+  sched();
+  panic("zombie exit");
+}
+
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
@@ -283,6 +401,9 @@ wait(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != curproc)
         continue;
+      // Jeevan
+      if(p->isthread)
+        continue;
       havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
@@ -294,6 +415,8 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        // Jeevan
+        p->threadcount = 0;
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
@@ -302,6 +425,56 @@ wait(void)
 
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
+}
+
+// Jeevan
+int
+kthread_wait(void** stack)
+{
+  struct proc *p;
+  int threadfound, pid;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    threadfound = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(!p->isthread)
+        continue;
+      if(p->parent != curproc)
+        continue;
+      threadfound = 1;
+      if(p->state == ZOMBIE){
+        // Found one.
+        pid = p->pid;
+        curproc->threadcount--;
+//        kfree(p->kstack);
+//        p->kstack = 0;
+//        freevm(p->pgdir);
+//        free(p->ustack);
+        *stack = p->ustack;
+        p->ustack = 0;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+	p->isthread = 0;
+        p->state = UNUSED;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!threadfound || curproc->killed){
       release(&ptable.lock);
       return -1;
     }
@@ -480,6 +653,14 @@ int
 kill(int pid)
 {
   struct proc *p;
+  struct proc *curproc = myproc();
+
+  // Jeevan
+  // Thread cannot kill its parent process
+  if(curproc->isthread && (curproc->parent->pid == pid)){
+    cprintf("Thread is trying to kill it's Parent\n");
+    return -1;
+  }
 
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){

@@ -13,6 +13,41 @@ sys_fork(void)
   return fork();
 }
 
+// Jeevan
+int
+sys_kthread_fork(void)
+{
+  char *stack;
+  void *pointer;
+
+  if(argptr(0,&stack,4)<0)
+    return -1;
+
+  if(argptr(1,(char**)&pointer,4)<0)
+    return -1;
+
+  return kthread_fork(stack, pointer);
+}
+
+// Jeevan
+int
+sys_kthread_exit(void)
+{
+  kthread_exit();
+  return 0;
+}
+
+// Jeevan
+int
+sys_kthread_wait(void)
+{
+  int stack;
+
+  if(argptr(0,(char **)&stack,4)<0)
+    return -1;
+  return kthread_wait((void **) stack);
+}
+
 int
 sys_exit(void)
 {

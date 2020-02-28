@@ -120,6 +120,10 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+// Jeevan
+int             kthread_fork(char*, void*);
+void            kthread_exit(void);
+int             kthread_wait(void**);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
