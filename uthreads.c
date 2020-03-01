@@ -1,9 +1,10 @@
 #include "types.h"
 #include "user.h"
-#define NTHREAD        10  // maximum number of threads 
+#define NTHREAD        10  // Maximum number of threads 
+#define STACK_SIZE     4096  // Size of stack 
 
 
-enum states{UNUSED, RUNNABLE, RUNNING};
+enum states{UNUSED, READY};
 
 struct thread{
   int tid;
@@ -12,9 +13,9 @@ struct thread{
   uint *stack;
 };
 
-int nexttid; // next value for tid
-int curthread; 
-struct thread threadtable[NTHREAD];
+int nexttid;                            // Next value for tid
+int curthread;                          // Current running thread 
+struct thread threadtable[NTHREAD];     // Thread table
   
 
 void uthread_init(){
@@ -37,14 +38,15 @@ void uthread_create(void *func){
 
   for(u = threadtable; u < &threadtable[NTHREAD]; u++){
     if(u->state == UNUSED){
-      u->stack = malloc(4096);
+      u->stack = malloc(STACK_SIZE);
       // Need to build stack
-      u->sp = u->stack + (4096/4) - 1;
+      u->sp = u->stack + (STACK_SIZE/4) - 1;
       u->sp--;
       *u->sp = (uint)func;
       u->sp--;
       *u->sp = (uint)u->sp;
-      u->state = RUNNABLE;
+      // Set struct entries
+      u->state = READY;
       u->tid = nexttid++;
       return;
     }
@@ -70,8 +72,7 @@ void uthread_scheduler(){
 
   for(i = 1; i <= NTHREAD; i++){
     index = (curthread + i)%NTHREAD;
-    if(threadtable[index].state == RUNNABLE){
-      threadtable[index].state = RUNNING;
+    if(threadtable[index].state == READY){
       curthread = index;
 
       // Switch from curthread stack to new stack
@@ -101,7 +102,7 @@ void uthread_exit(){
 
 
 void uthread_yield(){
-  threadtable[curthread].state = RUNNABLE;
+  threadtable[curthread].state = READY;
   uthread_scheduler();
 }
 
