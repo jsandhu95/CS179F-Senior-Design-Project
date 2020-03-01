@@ -1,58 +1,35 @@
 #include "types.h"
 #include "user.h"
 #define NTHREAD        10  // maximum number of threads 
-// Saves the value of esp to var
-#define STORE_ESP(var) asm("movl %%esp, %0;" : "=r" ( var ))
-// Loads the contents of var into esp
-#define LOAD_ESP(var) asm("movl %0, %%esp;" : : "r" ( var ))
-// Calls the function func
-#define CALL(addr) asm("call *%0;" : : "r" ( addr ))
-// Pushes the contents of var to the stack
-#define PUSH(var) asm("movl %0, %%edi; push %%edi;" : : "r" ( var ))
-#define PUSH_EBP 1
 
 
-enum states{UNUSED, RUNNABLE, RUNNING}
+enum states{UNUSED, RUNNABLE, RUNNING};
 
-struct tcb{
+struct thread{
   int tid;
   int state;
   uint *sp;
-  void *stack;
+  uint *stack;
 };
 
 int nexttid; // next value for tid
 int curthread; 
-struct tcb threadtable[NTHREAD];
+struct thread threadtable[NTHREAD];
   
 
 void uthread_init(){
-  struct tcb *u;
+  struct thread *u;
 
-  curthread = -1;
+  curthread = 0;
   nexttid = 0;
 
-  for(u = threadtable; u < &threadtable[NTHREAD]; u++){
+  for(int i = 0; i < NTHREAD; i++){
+    u = &threadtable[i];
     u->tid = 0;
     u->state = UNUSED;
+    u->stack = 0; 
     u->sp = 0;
   }
-}
-
-
-void PUSH(abc){
-  asm(
-    "push abc;"
-    "pop %eax;"
-    "push %eax;"
-    "subl %4, %esp;"
-  )
-}
-
-void POP(){
-  asm(
-    "addl %4, %esp;"
-  )
 }
 
 void uthread_create(void *func){
@@ -62,86 +39,87 @@ void uthread_create(void *func){
     if(u->state == UNUSED){
       u->stack = malloc(4096);
       // Need to build stack
-      // set up eip to func
+      u->sp = u->stack + (4096/4) - 1;
+      u->sp--;
+      *u->sp = (uint)func;
+      u->sp--;
+      *u->sp = (uint)u->sp;
       u->state = RUNNABLE;
       u->tid = nexttid++;
-      return 0;
+      return;
     }
   }
   printf(1,"Didn't find UNUSED entry");
-  return -1;
+  return;
+}
+
+
+void uthread_start(){
+  asm("movl %0, %%esp; movl %%esp, %%ebp"
+      :
+      : "r" (threadtable[0].sp)
+  );
+
+  return;
+}
+
+void uthread_scheduler(){
+  int i = 0;
+  int index = 0;
+  int curthread_temp = curthread;
+
+  for(i = 1; i <= NTHREAD; i++){
+    index = (curthread + i)%NTHREAD;
+    if(threadtable[index].state == RUNNABLE){
+      threadtable[index].state = RUNNING;
+      curthread = index;
+
+      // Switch from curthread stack to new stack
+      // Store current thread
+      asm("pushl %%ebp; movl %%esp, %0"
+          : "=r" (threadtable[curthread_temp].sp)
+         );
+      // Load new thread
+      asm("movl %0, %%esp; popl %%ebp"
+          :
+          : "r" (threadtable[index].sp)
+         );
+      return;
+    }
+  }
+  exit();
 }
 
 void uthread_exit(){
-  threadtable[curthread]->tid = 0;
-  free(threadtable[curthread]->sp);
-  threadtable[curthread]->sp = 0;
-  threadtable[curthread]->state = UNUSED;
+  threadtable[curthread].tid = 0;
+  free(threadtable[curthread].sp);
+  threadtable[curthread].sp = 0;
+  threadtable[curthread].stack = 0;
+  threadtable[curthread].state = UNUSED;
   uthread_scheduler();
 }
 
 
 void uthread_yield(){
-  threadtable[curthread]->state = RUNNABLE;
+  threadtable[curthread].state = RUNNABLE;
   uthread_scheduler();
 }
 
 
-void uthread_scheduler(){
-  int i = 0;
-  int j = curthread;
-  for(i = curthread + 1; i < NTHREAD; i++){
-    if(threadtable[i]->state == RUNNABLE){
-      threadtable[i]->state = RUNNING;
-      curthread = i;
-      context_switch(curthread, newthread);
-      // context switch occurs
-    }
-    // If found should never reach here
-    i = 0;
-    for(i = 0; i <= j; i++){
-      if(threadtable[i]->state == RUNNABLE){
-        threadtable[i]->state = RUNNING;
-        curthread = i;
-        // context switch occurs
-      }
-    }
-  }
-}
-
-void context_switch(tcb curthread, tcb newthread){
-  Save context for current thread:
-  PUSH_EBP();
-  STORE_ESP(curthread->sp);
-
-  Load context for new thread:
-  LOAD_ESP(newthread->sp);
-  set esp to top of new stack
-
-  POP_EBP();
-  pop ebp from stack
-
-  return;
-  pop return address from stack
-
-}
-
 void ping(){
-  printf(1,"ping\n");
-  uthread_yield();
-  printf(1,"ping\n");
-  uthread_yield();
-  printf(1,"ping\n");
+  for(int i = 0; i < 10; i++){
+    printf(1,"ping #%d\n", i);
+    uthread_yield();
+  }
   uthread_exit();
 }
 
 
 void pong(){
-  printf(1,"pong\n");
-  uthread_yield();
-  printf(1,"pong\n");
-  uthread_yield();
-  printf(1,"pong\n");
+  for(int i = 0; i < 5; i++){
+    printf(1,"pong #%d\n", i);
+    uthread_yield();
+  }
   uthread_exit();
 }
 
@@ -149,11 +127,9 @@ void pong(){
 int main(){
   uthread_init();
 
-  uthread_create(*func);
-  uthread_create(*func);
-
-  uthread_scheduler(); 
-
+  uthread_create(ping);
+  uthread_create(pong);
+  uthread_start();
 
   exit();
 }
