@@ -13,9 +13,17 @@ struct thread{
   uint *stack;
 };
 
+struct semaphore{
+  int lock;
+  void* acquire;
+  void* release;
+};
+
 int nexttid;                            // Next value for tid
 int curthread;                          // Current running thread 
+int counter;
 struct thread threadtable[NTHREAD];     // Thread table
+struct semaphore sem;
   
 
 void uthread_init(){
@@ -124,12 +132,48 @@ void pong(){
   uthread_exit();
 }
 
+void sem_init(){
+  sem.lock = 0;
+  counter = 0;
+  void (*sem().acquire)(int) = &acquire_lock;
+  void (*sem().release)(int) = &release_lock;
+  
+}
+
+void acquire_lock(){
+  while(sem.lock != 0){
+  }
+
+  sem.lock = 1;
+  return;
+}
+
+void release_lock(){
+  sem.lock = 0;
+  return;
+}
+
+
+void lock(){
+  //Acquire lock
+  sem().acquire;
+  printf(1,"Thread #%d has acquired the lock\n", threadtable[curthread].tid);
+  counter++;
+  printf(1,"Value of the shared variable is currently %d\n", counter);
+  //Release lock
+  sem().release;
+  uthread_exit();
+}
+
+
 
 int main(){
   uthread_init();
+  sem_init();
 
-  uthread_create(ping);
-  uthread_create(pong);
+  uthread_create(lock);
+  uthread_create(lock);
+  uthread_create(lock);
   uthread_start();
 
   exit();
