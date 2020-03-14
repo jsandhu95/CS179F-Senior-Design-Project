@@ -28,6 +28,31 @@ void release_lock(const struct semaphore* sem){
   return;
 }
 
+oid sem_init(){
+  struct semaphore *s;
+  s = &sem;
+  s->lock = 0;
+  s->acquire = acquire_lock;
+  s->release = release_lock;
+//  sem.lock = 0;
+  counter = 0;
+//  void (*acquire_ptr)(int) = &acquire_lock;
+//  void (*release_ptr)(int) = &release_lock;
+//  sem.acquire = acquire_ptr;
+//  sem.release = release_ptr;
+}
+
+void lock(){
+  //Acquire lock
+  sem.acquire(&sem);
+  printf(1,"Thread #%d has acquired the lock\n", threadtable[curthread].tid);
+  counter++;
+  printf(1,"Value of the shared variable is currently %d\n", counter);
+  //Release lock
+  sem.release(&sem);
+  uthread_exit();
+}
+
 char*
 start_kthread(){
   char* stack;
@@ -57,14 +82,14 @@ int main(){
   int pid = 0;
 
   void *(*fn)();
-  fn = (void*)&func;
+  fn = (void*)&lock;
 
-  for(i = 0; i < 50; i++){
+  for(i = 0; i < 3; i++){
     printf(1,"Starting Thread #%d\n", i);
     stack = start_kthread();
     kthread_fork(stack, fn);
   }
-  for(i = 0; i < 50; i++){
+  for(i = 0; i < 3; i++){
     pid = kthread_wait(&free_stack);
     printf(1, "Exiting Thread with pid %d\n", pid);
     kthread_free(free_stack);
