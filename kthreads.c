@@ -1,6 +1,33 @@
 #include "types.h"
 #include "user.h"
 
+struct semaphore{
+  int lock;
+  void (*acquire)(const struct semaphore*);
+  void (*release)(const struct semaphore*);
+//  void* acquire;
+//  void* release;
+};
+
+int nexttid;                            // Next value for tid
+int curthread;                          // Current running thread
+int counter;
+struct thread threadtable[NTHREAD];     // Thread table
+struct semaphore sem;
+
+void acquire_lock(const struct semaphore* sem){
+  while(sem->lock != 0){
+  }
+
+  sem->lock = 1;
+  return;
+}
+
+void release_lock(const struct semaphore* sem){
+  sem->lock = 0;
+  return;
+}
+
 char*
 start_kthread(){
   char* stack;
