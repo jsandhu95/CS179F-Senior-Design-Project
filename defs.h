@@ -124,6 +124,9 @@ void            yield(void);
 int             kthread_fork(char*, void*);
 void            kthread_exit(void);
 int             kthread_wait(void**);
+void            sem_init(void);
+void            sem_wait(void);
+void            sem_signal(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

@@ -23,3 +23,6 @@
 #define SYS_kthread_fork  22
 #define SYS_kthread_exit  23
 #define SYS_kthread_wait  24
+#define SYS_sem_init      25
+#define SYS_sem_wait      26
+#define SYS_sem_signal    27

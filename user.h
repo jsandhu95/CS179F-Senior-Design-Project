@@ -27,6 +27,9 @@ int uptime(void);
 int kthread_fork(char*, void*);
 int kthread_exit(void);
 int kthread_wait(void**);
+int sem_init(void);
+int sem_wait(void);
+int sem_signal(void);
 
 // ulib.c
 int stat(const char*, struct stat*);

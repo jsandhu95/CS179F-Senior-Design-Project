@@ -106,6 +106,9 @@ extern int sys_uptime(void);
 extern int sys_kthread_fork(void);
 extern int sys_kthread_exit(void);
 extern int sys_kthread_wait(void);
+extern int sys_sem_init(void);
+extern int sys_sem_wait(void);
+extern int sys_sem_signal(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -132,6 +135,9 @@ static int (*syscalls[])(void) = {
 [SYS_kthread_fork]    sys_kthread_fork,
 [SYS_kthread_exit]    sys_kthread_exit,
 [SYS_kthread_wait]    sys_kthread_wait,
+[SYS_sem_init]    sys_sem_init,
+[SYS_sem_wait]    sys_sem_wait,
+[SYS_sem_signal]    sys_sem_signal,
 };
 
 void

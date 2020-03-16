@@ -713,3 +713,49 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+struct semaphore{
+  struct spinlock lock;
+  struct proc *queue[NPROC];
+  int count;
+  int head;
+  int tail;
+} sem;
+
+void
+sem_init(void)
+{
+  for(int i = 0; i < NPROC; i++){
+    sem.queue[i] = 0;
+  }
+  sem.head = 0;
+  sem.tail = 0;
+  sem.count = 0;
+}
+
+void
+sem_wait(void)
+{
+  acquire(&sem.lock);
+  sem.count++;
+  if(sem.count > 1){
+    struct proc *curproc = myproc();
+    sem.queue[sem.tail] = curproc;
+    sem.tail++;
+    sleep(curproc, &sem.lock);
+  }
+  release(&sem.lock);
+}
+
+void
+sem_signal(void)
+{
+  acquire(&sem.lock);
+  sem.count--;
+  if(sem.count > 0){
+    struct proc *nextproc = sem.queue[sem.head];
+    sem.head++;
+    wakeup(nextproc);
+  }
+  release(&sem.lock);
+}

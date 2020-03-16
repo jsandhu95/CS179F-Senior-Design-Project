@@ -15,6 +15,27 @@ sys_fork(void)
 
 // Jeevan
 int
+sys_sem_init(void)
+{
+  sem_init();
+  return 0;
+}
+
+int
+sys_sem_wait(void)
+{
+  sem_wait();
+  return 0;
+}
+
+int
+sys_sem_signal(void)
+{
+  sem_signal();
+  return 0;
+}
+// Jeevan
+int
 sys_kthread_fork(void)
 {
   char *stack;
