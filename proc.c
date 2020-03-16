@@ -248,7 +248,7 @@ kthread_fork(char* stack, void* pointer)
   // Jeevan
   np->tf->esp = (uint)(stack + 4096 - (24*sizeof(int *)));
   np->tf->ebp = np->tf->esp;
-  np->tf->eip = (int)pointer;
+  np->tf->eip = (uint)pointer;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
