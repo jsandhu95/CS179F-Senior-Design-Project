@@ -742,6 +742,7 @@ sem_wait(void)
     struct proc *curproc = myproc();
     sem.queue[sem.tail] = curproc;
     sem.tail++;
+    sem.tail = sem.tail % NPROC;
     sleep(curproc, &sem.lock);
   }
   release(&sem.lock);
@@ -755,6 +756,7 @@ sem_signal(void)
   if(sem.count > 0){
     struct proc *nextproc = sem.queue[sem.head];
     sem.head++;
+    sem.head = sem.head % NPROC;
     wakeup(nextproc);
   }
   release(&sem.lock);
