@@ -1,6 +1,6 @@
 #include "types.h"
 #include "user.h"
-#define NTHREAD        6  // Maximum number of threads 
+#define NTHREAD        50  // Maximum number of threads 
 #define STACK_SIZE     4096  // Size of stack 
 
 
@@ -117,7 +117,7 @@ void uthread_yield(){
 
 
 void ping(){
-  for(int i = 0; i < 50; i++){
+  for(int i = 0; i < 2; i++){
     counter++;
     printf(1,"ping #%d\n", counter);
     uthread_yield();
@@ -127,7 +127,7 @@ void ping(){
 
 
 void pong(){
-  for(int i = 0; i < 50; i++){
+  for(int i = 0; i < 2; i++){
     counter++;
     printf(1,"pong #%d\n", counter);
     uthread_yield();
