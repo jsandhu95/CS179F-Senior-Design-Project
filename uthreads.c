@@ -15,7 +15,7 @@ struct thread{
 
 int nexttid;                            // Next value for tid
 int curthread;                          // Current running thread 
-int counter;
+int counter;                            // Shared variable to be updated by threads
 struct thread threadtable[NTHREAD];     // Thread table
   
 
@@ -25,6 +25,7 @@ void uthread_init(){
   curthread = 0;
   nexttid = 0;
 
+  // Intialize threadtable
   for(int i = 0; i < NTHREAD; i++){
     u = &threadtable[i];
     u->tid = 0;
@@ -42,12 +43,15 @@ void uthread_create(void *func){
       u->stack = malloc(STACK_SIZE);
       // Need to build stack
       // Go from bottom of stack to top of stack
+      // STACK_SIZE/4 STACK_SIZE is 4 bytes and we want to add only 1 byte
+      // Subtract 1 so we don't go into unallocated memory
       u->sp = u->stack + (STACK_SIZE/4) - 1;
       u->sp--;
       // Push return address of function for eip
       *u->sp = (uint)func;
       u->sp--;
       // Contents of u->sp becomes address of u->sp. Which is ebp
+      // So when this gets popped will have the address for ebp
       *u->sp = (uint)u->sp;
       // Set struct entries
       u->state = READY;
