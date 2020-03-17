@@ -1,6 +1,6 @@
 #include "types.h"
 #include "user.h"
-#define NTHREAD        10  // Maximum number of threads 
+#define NTHREAD        6  // Maximum number of threads 
 #define STACK_SIZE     4096  // Size of stack 
 
 
@@ -15,6 +15,7 @@ struct thread{
 
 int nexttid;                            // Next value for tid
 int curthread;                          // Current running thread 
+int counter;
 struct thread threadtable[NTHREAD];     // Thread table
   
 
@@ -40,10 +41,13 @@ void uthread_create(void *func){
     if(u->state == UNUSED){
       u->stack = malloc(STACK_SIZE);
       // Need to build stack
+      // Go from bottom of stack to top of stack
       u->sp = u->stack + (STACK_SIZE/4) - 1;
       u->sp--;
+      // Push return address of function for eip
       *u->sp = (uint)func;
       u->sp--;
+      // Contents of u->sp becomes address of u->sp. Which is ebp
       *u->sp = (uint)u->sp;
       // Set struct entries
       u->state = READY;
@@ -57,6 +61,8 @@ void uthread_create(void *func){
 
 
 void uthread_start(){
+  // Read the first threads stack pointer and save it into both esp and ebp
+  // Can't send it straight to the scheduler because there is no previous context to load
   asm("movl %0, %%esp; movl %%esp, %%ebp"
       :
       : "r" (threadtable[0].sp)
@@ -68,12 +74,13 @@ void uthread_start(){
 void uthread_scheduler(){
   int i = 0;
   int index = 0;
-  int curthread_temp = curthread;
+  int curthread_temp = curthread; //Save the current thread so it can be accessed by assembler code
 
   for(i = 1; i <= NTHREAD; i++){
-    index = (curthread + i)%NTHREAD;
+    index = (curthread + i) % NTHREAD; // Round Robin Scheduler. Go through all entries in threadtable starting at curthread and go back to beginning.
+
     if(threadtable[index].state == READY){
-      curthread = index;
+      curthread = index; // Curthread is current running thread
 
       // Switch from curthread stack to new stack
       // Store current thread
@@ -85,9 +92,12 @@ void uthread_scheduler(){
           :
           : "r" (threadtable[index].sp)
          );
+      // No additional code can be added here, Immediately using "return" is key to context switch functionality
       return;
     }
   }
+  // This is how program calls exit()
+  // When no threads in READY state can be found, program will exit here
   exit();
 }
 
@@ -102,14 +112,14 @@ void uthread_exit(){
 
 
 void uthread_yield(){
-  threadtable[curthread].state = READY;
   uthread_scheduler();
 }
 
 
 void ping(){
-  for(int i = 0; i < 10; i++){
-    printf(1,"ping #%d\n", i);
+  for(int i = 0; i < 50; i++){
+    counter++;
+    printf(1,"ping #%d\n", counter);
     uthread_yield();
   }
   uthread_exit();
@@ -117,8 +127,9 @@ void ping(){
 
 
 void pong(){
-  for(int i = 0; i < 5; i++){
-    printf(1,"pong #%d\n", i);
+  for(int i = 0; i < 50; i++){
+    counter++;
+    printf(1,"pong #%d\n", counter);
     uthread_yield();
   }
   uthread_exit();
@@ -127,10 +138,16 @@ void pong(){
 
 int main(){
   uthread_init();
+  counter = 0;
 
-  uthread_create(ping);
-  uthread_create(pong);
+  for(int i = 0; i < NTHREAD/2; i++){
+    uthread_create(ping);
+    uthread_create(pong);
+  }
   uthread_start();
 
+  // Shouldn't reach this point.
+  // Once threads are created and started, they take over
+  // Main process isn't used anymore
   exit();
 }
