@@ -13,6 +13,7 @@ struct {
 } ptable;
 
 // Jeevan
+// Semaphore structure
 struct semaphore{
   struct spinlock lock;
   struct proc *queue[NPROC];
@@ -22,6 +23,7 @@ struct semaphore{
   int active;
 };
 
+// Array of available semaphores
 struct semaphore sem_array[NPROC];
 
 static struct proc *initproc;
@@ -123,6 +125,8 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+  // Jeevan
+  // Set new PCB entries
   p->isthread = 0;
   p->threadcount = 0;
 
@@ -249,6 +253,7 @@ kthread_fork(char* stack, void* pointer)
   }
 
   // Jeevan
+  // Set PCB entries
   np->ustack = stack;
   np->pgdir = curproc->pgdir;
   np->sz = curproc->sz;
@@ -258,18 +263,18 @@ kthread_fork(char* stack, void* pointer)
   curproc->threadcount++;
 
   // Jeevan
+  // esp currently points to bottom of stack
+  // This points it to the top of stack, without going over into non-allocated space
   np->tf->esp = (uint)(stack + 4096 - (1*sizeof(int *)));
+  // No parameters so set ebp to esp
   np->tf->ebp = np->tf->esp;
+  // Set eip so thread knows where to start
   np->tf->eip = (uint)pointer;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
-/*  for(i = 0; i < NOFILE; i++)
-    if(curproc->ofile[i])
-      np->ofile[i] = filedup(curproc->ofile[i]);
-  np->cwd = idup(curproc->cwd);
-*/
+  // No need to duplicate file descriptors, just have to copy them from parent process
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
       np->ofile[i] = curproc->ofile[i];
@@ -363,34 +368,15 @@ kthread_exit(void)
   if(curproc == initproc)
     panic("init exiting");
 
-/*
-  // Close all open files.
-  for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd]){
-      fileclose(curproc->ofile[fd]);
-      curproc->ofile[fd] = 0;
-    }
-  }
+  // Don't want to close file descriptors and open files because other threads and parent process will need them
 
-  begin_op();
-  iput(curproc->cwd);
-  end_op();
-  curproc->cwd = 0;
-*/
   acquire(&ptable.lock);
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
 
-  // Pass abandoned children to init.
-/*  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
-    }
-  }
-*/
+  // Will never have abandoned children. No need to pass them to init
+
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
   sched();
@@ -429,6 +415,7 @@ wait(void)
         p->killed = 0;
         // Jeevan
         p->threadcount = 0;
+        p->isthread = 0;
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
@@ -459,6 +446,7 @@ kthread_wait(void** stack)
     // Scan through table looking for exited children.
     threadfound = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      // Only want to wait on threads
       if(!p->isthread)
         continue;
       if(p->parent != curproc)
@@ -467,12 +455,11 @@ kthread_wait(void** stack)
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
+        // Decrement parents threadcount
         curproc->threadcount--;
-//        kfree(p->kstack);
-//        p->kstack = 0;
-//        freevm(p->pgdir);
-//        free(p->ustack);
+        // Pass the stack by reference so that memory can be freed in user space
         *stack = p->ustack;
+        // Reset ptable entry values
         p->ustack = 0;
         p->pid = 0;
         p->parent = 0;
@@ -726,7 +713,7 @@ procdump(void)
   }
 }
 
-
+// Initializes the semaphore array library by setting the entire array to inactive
 void
 sem_init(void)
 {
@@ -735,11 +722,14 @@ sem_init(void)
   }
 }
 
+// Allocates semaphore in sem_array
 int
 get_sem(void)
 {
   for(int i = 0; i < NPROC; i++){
+    // Looking for inactive entry
     if(sem_array[i].active == 0){
+      // Initialize queue and semaphore structure entries
       for(int j = 0; j < NPROC; j++){
         sem_array[i].queue[j] = 0;
       }
@@ -750,10 +740,12 @@ get_sem(void)
       return i;
     }
   }
+  // Should only reach here if have NPROC number of semaphores
   cprintf("No available semaphores");
   return -1;
 }
 
+// Clears entry in sem_array
 void
 free_sem(int sem_index)
 {
@@ -770,12 +762,18 @@ void
 sem_wait(int sem_index)
 {
   acquire(&sem_array[sem_index].lock);
+  // Increment number of processes or threads waiting for access
   sem_array[sem_index].count++;
   if(sem_array[sem_index].count > 1){
+    // Add waiting processes or threads to waiting queue
     struct proc *curproc = myproc();
     sem_array[sem_index].queue[sem_array[sem_index].tail] = curproc;
+    // Increment tail for next time
     sem_array[sem_index].tail++;
+    // When tail reaches the end of the array, it loops back to the beginning
     sem_array[sem_index].tail = sem_array[sem_index].tail % NPROC;
+    // Set process or thread to sleep, will be woken up when it is its turn to access the critical resources
+    // sleep() automatically releases the lock
     sleep(curproc, &sem_array[sem_index].lock);
   }
   release(&sem_array[sem_index].lock);
@@ -785,11 +783,16 @@ void
 sem_signal(int sem_index)
 {
   acquire(&sem_array[sem_index].lock);
+  // Decrement number of processes or threads waiting for access
   sem_array[sem_index].count--;
   if(sem_array[sem_index].count > 0){
+    // If there are processes or threads waiting in the queue, set nextproc to the head. Head is next process or thread in the queue
     struct proc *nextproc = sem_array[sem_index].queue[sem_array[sem_index].head];
+    // Increment head for next time
     sem_array[sem_index].head++;
+    // When head reaches the end of the array, it loops back to the beginning
     sem_array[sem_index].head = sem_array[sem_index].head % NPROC;
+    // Wakeup the next process or thread to give access to critical resources
     wakeup(nextproc);
   }
   release(&sem_array[sem_index].lock);

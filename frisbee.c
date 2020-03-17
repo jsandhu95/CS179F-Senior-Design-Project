@@ -16,14 +16,15 @@ void play_frisbee(){
   
   for(;;){
     if(frisbee.pass_number >= max_passes){
+      // Have reached the end of the game
       kthread_exit();
     }
     if(current_thrower == frisbee.previous_thrower){
+      // Player can't catch the frisbee if they threw it
       sleep(10);
     }
     sem_wait(sem_index);
     if(frisbee.pass_number < max_passes){
-//      printf(1, "Player with pid %d has caught the frisbee\n", current_thrower);
       frisbee.pass_number++;
       frisbee.previous_thrower = current_thrower;
       printf(1, "Pass #%d Caught by player %d\n", frisbee.pass_number, frisbee.previous_thrower);

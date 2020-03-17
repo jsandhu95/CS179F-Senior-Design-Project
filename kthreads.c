@@ -1,22 +1,28 @@
 #include "types.h"
 #include "user.h"
 
-char*
-start_kthread(){
+void
+start_kthread(void* func){
   char* stack;
+
   stack = malloc(4096);
-  return stack;
+  kthread_fork(stack, func);
+  return;
 }
 
-void
-kthread_free(void* free_stack){
+int
+close_kthread(){
+  void* free_stack;
+  int pid = 0;
+
+  pid = kthread_wait(&free_stack);
   free(free_stack);
-  return;
+  return pid;
 }
 
 void func(){
   int i;
-  for(i = 0; i < 2; i++){
+  for(i = 0; i < 10; i++){
     sleep(10);
   }
   kthread_exit();
@@ -24,22 +30,15 @@ void func(){
 
 int main(){
   int i = 0;
-  char* stack;
-  void* free_stack;
   int pid = 0;
-
-//  void *(*fn)();
-//  fn = (void*)&func;
 
   for(i = 0; i < 3; i++){
     printf(1,"Starting Thread #%d\n", i);
-    stack = start_kthread();
-    kthread_fork(stack, func);
+    start_kthread(func);
   }
   for(i = 0; i < 3; i++){
-    pid = kthread_wait(&free_stack);
+    pid = close_kthread();
     printf(1, "Exiting Thread with pid %d\n", pid);
-    kthread_free(free_stack);
   }
     exit();
 }
