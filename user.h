@@ -28,8 +28,10 @@ int kthread_fork(char*, void*);
 int kthread_exit(void);
 int kthread_wait(void**);
 int sem_init(void);
-int sem_wait(void);
-int sem_signal(void);
+int sem_wait(int);
+int sem_signal(int);
+int get_sem(void);
+int free_sem(int);
 
 // ulib.c
 int stat(const char*, struct stat*);

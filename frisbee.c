@@ -8,6 +8,7 @@ struct frisbee{
 
 int max_passes;
 int num_players;
+int sem_index;
 
 
 void play_frisbee(){
@@ -20,7 +21,7 @@ void play_frisbee(){
     if(current_thrower == frisbee.previous_thrower){
       sleep(10);
     }
-    sem_wait();
+    sem_wait(sem_index);
     if(frisbee.pass_number < max_passes){
 //      printf(1, "Player with pid %d has caught the frisbee\n", current_thrower);
       frisbee.pass_number++;
@@ -30,7 +31,7 @@ void play_frisbee(){
         printf(1,"Max number of passes reached. Game over.\n");
       }
     }
-    sem_signal();
+    sem_signal(sem_index);
   }
 }
 
@@ -57,6 +58,7 @@ close_kthread(){
 int main(int argc, char *argv[]){
   int i = 0;
   int pid = 0;
+  sem_index = 0;
   frisbee.pass_number = 0;
   frisbee.previous_thrower = 0;
 
@@ -81,13 +83,14 @@ int main(int argc, char *argv[]){
   }
 
   sem_init();
+  sem_index = get_sem();
 
-  sem_wait();
+  sem_wait(sem_index);
   for(i = 0; i < num_players; i++){
     printf(1,"Starting Thread #%d\n", i);
-    start_kthread((void*)play_frisbee);
+    start_kthread(play_frisbee);
   }
-  sem_signal();
+  sem_signal(sem_index);
   for(i = 0; i < num_players; i++){
     pid = close_kthread();
     printf(1, "Exiting Thread with pid %d\n", pid);

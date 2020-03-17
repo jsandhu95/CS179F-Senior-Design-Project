@@ -12,6 +12,18 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
+// Jeevan
+struct semaphore{
+  struct spinlock lock;
+  struct proc *queue[NPROC];
+  int count;
+  int head;
+  int tail;
+  int active;
+};
+
+struct semaphore sem_array[NPROC];
+
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -246,7 +258,7 @@ kthread_fork(char* stack, void* pointer)
   curproc->threadcount++;
 
   // Jeevan
-  np->tf->esp = (uint)(stack + 4096 - (24*sizeof(int *)));
+  np->tf->esp = (uint)(stack + 4096 - (1*sizeof(int *)));
   np->tf->ebp = np->tf->esp;
   np->tf->eip = (uint)pointer;
 
@@ -714,50 +726,71 @@ procdump(void)
   }
 }
 
-struct semaphore{
-  struct spinlock lock;
-  struct proc *queue[NPROC];
-  int count;
-  int head;
-  int tail;
-} sem;
 
 void
 sem_init(void)
 {
   for(int i = 0; i < NPROC; i++){
-    sem.queue[i] = 0;
+    sem_array[i].active = 0;
   }
-  sem.head = 0;
-  sem.tail = 0;
-  sem.count = 0;
+}
+
+int
+get_sem(void)
+{
+  for(int i = 0; i < NPROC; i++){
+    if(sem_array[i].active == 0){
+      for(int j = 0; j < NPROC; j++){
+        sem_array[i].queue[j] = 0;
+      }
+      sem_array[i].count = 0;
+      sem_array[i].head = 0;
+      sem_array[i].tail = 0;
+      sem_array[i].active = 1;
+      return i;
+    }
+  }
+  cprintf("No available semaphores");
+  return -1;
 }
 
 void
-sem_wait(void)
+free_sem(int sem_index)
 {
-  acquire(&sem.lock);
-  sem.count++;
-  if(sem.count > 1){
+  for(int j = 0; j < NPROC; j++){
+    sem_array[sem_index].queue[j] = 0;
+  }
+  sem_array[sem_index].head = 0;
+  sem_array[sem_index].tail = 0;
+  sem_array[sem_index].count = 0;
+  sem_array[sem_index].active = 0;
+}
+
+void
+sem_wait(int sem_index)
+{
+  acquire(&sem_array[sem_index].lock);
+  sem_array[sem_index].count++;
+  if(sem_array[sem_index].count > 1){
     struct proc *curproc = myproc();
-    sem.queue[sem.tail] = curproc;
-    sem.tail++;
-    sem.tail = sem.tail % NPROC;
-    sleep(curproc, &sem.lock);
+    sem_array[sem_index].queue[sem_array[sem_index].tail] = curproc;
+    sem_array[sem_index].tail++;
+    sem_array[sem_index].tail = sem_array[sem_index].tail % NPROC;
+    sleep(curproc, &sem_array[sem_index].lock);
   }
-  release(&sem.lock);
+  release(&sem_array[sem_index].lock);
 }
 
 void
-sem_signal(void)
+sem_signal(int sem_index)
 {
-  acquire(&sem.lock);
-  sem.count--;
-  if(sem.count > 0){
-    struct proc *nextproc = sem.queue[sem.head];
-    sem.head++;
-    sem.head = sem.head % NPROC;
+  acquire(&sem_array[sem_index].lock);
+  sem_array[sem_index].count--;
+  if(sem_array[sem_index].count > 0){
+    struct proc *nextproc = sem_array[sem_index].queue[sem_array[sem_index].head];
+    sem_array[sem_index].head++;
+    sem_array[sem_index].head = sem_array[sem_index].head % NPROC;
     wakeup(nextproc);
   }
-  release(&sem.lock);
+  release(&sem_array[sem_index].lock);
 }

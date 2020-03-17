@@ -24,16 +24,42 @@ sys_sem_init(void)
 int
 sys_sem_wait(void)
 {
-  sem_wait();
+  int sem_index;
+
+  if(argint(0, &sem_index) < 0)
+    return -1;
+  sem_wait(sem_index);
   return 0;
 }
 
 int
 sys_sem_signal(void)
 {
-  sem_signal();
+  int sem_index;
+
+  if(argint(0, &sem_index) < 0)
+    return -1;
+  sem_signal(sem_index);
   return 0;
 }
+
+int
+sys_get_sem(void)
+{
+  return get_sem();
+}
+
+int
+sys_free_sem(void)
+{
+  int sem_index;
+
+  if(argint(0, &sem_index) < 0)
+    return -1;
+  free_sem(sem_index);
+  return 0;
+}
+
 // Jeevan
 int
 sys_kthread_fork(void)

@@ -109,6 +109,8 @@ extern int sys_kthread_wait(void);
 extern int sys_sem_init(void);
 extern int sys_sem_wait(void);
 extern int sys_sem_signal(void);
+extern int sys_get_sem(void);
+extern int sys_free_sem(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -138,6 +140,8 @@ static int (*syscalls[])(void) = {
 [SYS_sem_init]    sys_sem_init,
 [SYS_sem_wait]    sys_sem_wait,
 [SYS_sem_signal]    sys_sem_signal,
+[SYS_get_sem]    sys_get_sem,
+[SYS_free_sem]    sys_free_sem,
 };
 
 void

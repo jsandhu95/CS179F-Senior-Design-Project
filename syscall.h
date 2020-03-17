@@ -26,3 +26,5 @@
 #define SYS_sem_init      25
 #define SYS_sem_wait      26
 #define SYS_sem_signal    27
+#define SYS_get_sem       28
+#define SYS_free_sem      29
