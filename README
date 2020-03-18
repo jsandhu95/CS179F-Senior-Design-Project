@@ -1,3 +1,113 @@
+CS179F Senior Design Project
+by Jeevan Sandhu
+xv6 Thread Implementation
+
+For my Senior Design Project, I added thread capability to the xv6 operating system. This includes Kernel and User level threads, as well as semaphore implementation. 
+
+------------------------------KERNEL THREADS------------------------------------
+My kernel thread implementation consisted of three system calls and two user functions. The three system calls are very similar to existing system calls meant to manage processes. They are kthread_fork, kthread_exit, and kthread_wait. The two user functions are start_kthread and close_kthread. 
+
+The proc struct also has three new fields. ustack which is a pointer to the user stack. isthread, which is a flag to determine whether a process is a thread. threadcount, which is how many threads this process is a parent to.
+
+The user would create a kernel thread by calling start_kthread, which will allocate a user stack and call kthread_fork. At the end of the function that the thread is executing will be kthread_exit. Once the thread has exited, the user will call close_thread. close_thread will call thread_wait which will reap the ZOMBIE thread and deallocate any memory used by it as well as clear the pcb entry in the ptable.
+
+kthread_fork:
+Similar to fork(). Takes the stack and function pointer as arguments. Sets up the PCB entries and creates the stack. Copies parents file descriptors and returns and integer pid.
+
+kthread_exit:
+Similar to exit(). Tests to make sure that it has been called by a thread. If so, sets state to ZOMBIE.
+
+kthread_wait:
+Similar to wait(). Iterates through ptable looking for child threads. Once it has found one, clears PCB entries and sets state to UNUSED. Returns the ustack by reference to be freed in user space
+
+start_kthread:
+Takes a function pointer as an argument which will be passed to kthread_fork. Allocates a stack using malloc() which is passed to kthread_fork.
+
+close_kthread:
+Calls kthread_wait and passes an empty stack pointer. kthread_wait returns the stack pointer by reference now pointing at threads ustack. Frees user stack via free(). 
+
+
+HOW TO RUN:
+Checkout into Kernel_Threads branch.
+Run xv6 using "make qemu-nox"
+Use "kthreads" in command line to run simple thread test. User makes three kernel threads and then closes them
+Use "ktest2" in command line to run stress test. User makes 50 kernel threads and closes them.
+Use "k_usertests" in command line to run kill() and exit() tests. Kernel thread calls exit() to test whether threads can call exit(). Kernel thread calls kill() trying to kill its parent. Tests whether threads can kill parent process, which they shouldn't be able to.
+
+
+
+--------------------------------USER THREADS------------------------------------
+My User threads implementation consisted of six user space functions as well as a thread struct. These functions are uthread_init, uthread_create, uthread_start, uthread_yield, uthread_exit, and uthread_scheduler.
+
+The thread struct has 4 fields. tid is thread id integer. state is either UNUSED or READY. sp is the stack pointer, which is where esp will be saved. stack is the allocated stack memory from malloc().
+
+The user can create a user thread by first calling uthread_init, and then calling uthread_create to create one user thread. User can call uthread_create many times to create multiple user threads. User then needs to call uthread_start to start the very first thread. Once this is done the threads take over and any code that was written after uthread_start will not execute.
+
+uthread_init:
+Initializes all values in the threadtable array. Sets all states to UNUSED.
+
+uthread_create:
+Finds UNUSED entry in threadtable and allocates it to a thread. Allocates a stack with malloc() and sets up stack. Sets eip and ebp registers. Sets state to READY.
+
+uthread_exit:
+Empties thread entry in threadtable. Sets state to UNUSED. 
+
+uthread_yield:
+Thread calls uthread_yield to voluntarily give up context for another thread. Calls uthread_scheduler() and assigns next READY thread in threadtable.
+
+uthread_scheduler:
+Round-Robin scheduler for threadtable. Finds READY thread and performs context switch. 
+
+uthread_start:
+Starts very first thread. Sets up stack for scheduler to be able to perform context switch on first thread.
+
+
+HOW TO RUN:
+Checkout into User_Threads branch.
+Run xv6 using "make qemu-nox"
+Use "uthreads" in command line to run functionality and stress thread test. User makes 50 user threads which play a game of ping pong. Each thread will either ping or pong, and then call thread_yield allowing the next thread to ping or pong. Each thread will ping or pong twice, meaning 100 context switches will occur among the 50 threads. All threads then exit and the program exits.
+
+
+
+----------------------------------Semaphores------------------------------------
+My semaphore implementation consisted of five system calls and one semaphore struct. The system calls are sem_init, get_sem, free_sem, sem_wait, and sem_signal. It also has a global array of all semaphores called sem_array.
+
+The semaphore struct has 6 fields. lock is a spinlock. queue is the array of waiting processes or threads. count is the number of processes or threads in the waiting queue. head is the next index in the queue. tail is the last index in the queue. active is a flag that is true if this semaphore in the sem_array is currently being used.
+
+To create a semaphore, first call sem_init. Then call get_sem and save it into an integer variable, sem_index = get_sem(). get_sem will return the index of the semaphore allocated to the program in the sem_array. Surround the critical region with sem_wait(sem_index) and sem_signal(sem_index). These will implement the locks and the queue. When finished witha semaphore call free_sem(sem_index) to deallocate that entry in the sem_array.
+
+sem_init:
+Sets all entries in sem_array to inactive.
+
+get_sem:
+Searches the sem_array for inactive entry. Initializes all struct values in that entry and sets it to active.
+
+free_sem:
+Has an integer as an argument. Integer is the index in the sem_array of semaphore to be freed. Deallocates that semaphore and sets to inactive.
+
+sem_wait:
+Acquires the spinlock. If there are processes or threads waiting in the queue, it adds process or thread to the end of the queue and puts it to sleep.
+
+sem_signal:
+Acquires the spinlock. If there are processes or threads waiting in the queue, it wakes up the next one in line to access the critical region.
+
+Frisbee game test:
+To test the semaphore, I implemented a frisbee game. The user inputs a number of players and a number of passes. A kernel thread will be created and act as each player. "Catching the frisbee" is protected by semaphores in a critical region. Each player must wait in the semaphore queue for their turn to catch the frisbee. A player cannot catch two frisbees in row, ie the player cannot throw a frisbee to themself. Once the max number of passes has been reached the game ends and the threads exit.
+
+
+HOW TO RUN:
+Checkout into Kernel_Threads branch.
+Run xv6 using "make qemu-nox"
+To run frisbee game, in command line input:
+"frisbee [number of players] [number of passes]"
+Ex: frisbee 10 100
+
+
+
+
+
+--------------------------------------------------------------------------------
+
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
 Version 6 (v6).  xv6 loosely follows the structure and style of v6,
 but is implemented for a modern x86-based multiprocessor using ANSI C.
