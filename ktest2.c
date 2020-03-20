@@ -33,11 +33,11 @@ int main(){
   int i = 0;
   int pid = 0;
 
-  for(i = 0; i < 50; i++){
+  for(i = 0; i < 100; i++){
     printf(1,"Starting thread #%d\n",i);
     start_kthread(func);
   }
-  for(i = 0; i < 50; i++){
+  for(i = 0; i < 100; i++){
     pid = close_kthread();
     printf(1, "Exiting thread with pid %d\n", pid);
   }
