@@ -83,7 +83,6 @@ int main(int argc, char *argv[]){
     exit();
   }
 
-  sem_init();
   sem_index = get_sem();
 
   sem_wait(sem_index);

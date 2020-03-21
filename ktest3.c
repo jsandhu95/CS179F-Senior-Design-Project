@@ -13,7 +13,7 @@ start_kthread(void* func){
 }
 
 int
-close_kthread(){
+join_kthread(){
   void* free_stack;
   int pid = 0;
 
@@ -36,12 +36,12 @@ int main(){
 
   printf(1,"Kill Test: Thread trying to kill it's parent\n");
   start_kthread(func1);
-  close_kthread();
+  join_kthread();
   printf(1,"Kill Test Passed: Thread failed to kill it's parent\n");
 
   printf(1,"Exit Test: Thread trying to call exit() instead of thread_exit()\n");
   start_kthread(func2);
-  close_kthread();
+  join_kthread();
   printf(1,"Exit Test Passed: Thread got redirected to thread_exit()\n");
 
   exit();

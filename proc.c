@@ -38,6 +38,7 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  sem_init();
 }
 
 // Must be called with interrupts disabled

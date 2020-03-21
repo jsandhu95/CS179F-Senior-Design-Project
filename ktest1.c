@@ -11,7 +11,7 @@ start_kthread(void* func){
 }
 
 int
-close_kthread(){
+join_kthread(){
   void* free_stack;
   int pid = 0;
 
@@ -37,7 +37,7 @@ int main(){
     start_kthread(func);
   }
   for(i = 0; i < 3; i++){
-    pid = close_kthread();
+    pid = join_kthread();
     printf(1, "Exiting Thread with pid %d\n", pid);
   }
     exit();
